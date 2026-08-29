@@ -39,7 +39,7 @@ jobs:
           python-version: "3.13"
           cache: ""
 
-      - name: Resolve and validate version
+      - name: Resolve version
         id: version
         shell: bash
         run: |
@@ -49,39 +49,26 @@ jobs:
           else
             version="${{ inputs.version }}"
           fi
-          [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || {
-            echo "Invalid semantic version tag: $version" >&2
-            exit 64
-          }
+          [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || exit 64
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "plain=${version#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Install package
-        run: python -m pip install --disable-pip-version-check --no-deps -e .
 
       - name: Re-run release gates
         shell: bash
         run: |
           set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-deps -e .
           python -m compileall -q src scripts tests
           python -m unittest discover -s tests -v
           python scripts/public_audit.py .
           rm -rf /tmp/goal49-release-a /tmp/goal49-release-b
-          goal49-ops-demo run-demo \
-            --config examples/synthetic-config.json \
-            --universe examples/synthetic-universe.json \
-            --workdir /tmp/goal49-release-a > /tmp/result-a.json
-          goal49-ops-demo run-demo \
-            --config examples/synthetic-config.json \
-            --universe examples/synthetic-universe.json \
-            --workdir /tmp/goal49-release-b > /tmp/result-b.json
+          goal49-ops-demo run-demo --config examples/synthetic-config.json --universe examples/synthetic-universe.json --workdir /tmp/goal49-release-a > /tmp/result-a.json
+          goal49-ops-demo run-demo --config examples/synthetic-config.json --universe examples/synthetic-universe.json --workdir /tmp/goal49-release-b > /tmp/result-b.json
           diff -u /tmp/result-a.json /tmp/result-b.json
           diff -ru /tmp/goal49-release-a /tmp/goal49-release-b
-          goal49-ops-demo verify \
-            --workdir /tmp/goal49-release-a \
-            --target DEMO-2026-01-15
+          goal49-ops-demo verify --workdir /tmp/goal49-release-a --target DEMO-2026-01-15
 
-      - name: Create or verify release tag
+      - name: Create or verify tag
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -91,17 +78,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch --tags --force
           if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
-            tagged_commit="$(git rev-list -n 1 "$VERSION")"
-            [[ "$tagged_commit" == "$GITHUB_SHA" ]] || {
-              echo "$VERSION already points to $tagged_commit, not $GITHUB_SHA" >&2
-              exit 65
-            }
+            [[ "$(git rev-list -n 1 "$VERSION")" == "$GITHUB_SHA" ]] || exit 65
           else
             git tag -a "$VERSION" -m "Goal49 Operations Case Study $VERSION"
             git push origin "$VERSION"
           fi
 
-      - name: Build release artifacts
+      - name: Build artifacts
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -110,33 +93,12 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           prefix="goal49-ops-case-study-${PLAIN_VERSION}/"
-          git archive --format=tar --prefix="$prefix" "$VERSION" \
-            | gzip -n > "dist/goal49-ops-case-study-${PLAIN_VERSION}.tar.gz"
-          git archive --format=zip --prefix="$prefix" "$VERSION" \
-            > "dist/goal49-ops-case-study-${PLAIN_VERSION}.zip"
+          git archive --format=tar --prefix="$prefix" "$VERSION" | gzip -n > "dist/goal49-ops-case-study-${PLAIN_VERSION}.tar.gz"
+          git archive --format=zip --prefix="$prefix" "$VERSION" > "dist/goal49-ops-case-study-${PLAIN_VERSION}.zip"
           python -m pip wheel --disable-pip-version-check --no-deps --wheel-dir dist .
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          payload = {
-              "schema": 1,
-              "repository": os.environ["GITHUB_REPOSITORY"],
-              "version": os.environ["VERSION"],
-              "commit": os.environ["GITHUB_SHA"],
-              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
-              "workflow_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
-              "tests": 17,
-              "python_matrix": ["3.11", "3.12", "3.13"],
-              "public_boundary_audit": "passed",
-              "deterministic_demo": "passed",
-          }
-          Path("dist/RELEASE_PROVENANCE.json").write_text(
-              json.dumps(payload, indent=2, sort_keys=True) + "\n",
-              encoding="utf-8",
-          )
-          PY
+          printf '{\n  "commit": "%s",\n  "deterministic_demo": "passed",\n  "public_boundary_audit": "passed",\n  "repository": "%s",\n  "schema": 1,\n  "tests": 17,\n  "version": "%s",\n  "workflow_run_id": "%s"\n}\n' \
+            "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$VERSION" "$GITHUB_RUN_ID" \
+            > dist/RELEASE_PROVENANCE.json
           (cd dist && sha256sum \
             goal49-ops-case-study-${PLAIN_VERSION}.tar.gz \
             goal49-ops-case-study-${PLAIN_VERSION}.zip \
@@ -156,20 +118,9 @@ jobs:
 
           A sanitized, executable reliability-engineering case study for scheduled decision pipelines.
 
-          ### Included
+          Included: canonical snapshot integrity, data freshness and coverage gates, deterministic fallback, stable delivery identity, duplicate/conflict protection, deadline-aware failure, stage-specific health checks, synthetic fixtures, 17 regression tests and Python 3.11–3.13 CI.
 
-          - Canonical snapshots with SHA-256 tamper detection.
-          - Freshness, target-date, uniqueness and coverage gates.
-          - Deterministic ordered provider fallback.
-          - Stable delivery identity, duplicate suppression and conflict blocking.
-          - Hard-deadline status-only behavior.
-          - Separate preparation and final-delivery health checks.
-          - Synthetic, network-free fixtures and 17 regression tests.
-          - Python 3.11–3.13 CI, public-boundary audit and deterministic demo checks.
-
-          ### Explicit boundary
-
-          This release contains no private selection factors, thresholds, rankings, real instruments, prices, recommendations, performance, credentials, production state or message destinations. It is an operations case study, not an investment system or an exactly-once distributed-delivery guarantee.
+          This release contains no private selection logic, real instruments, prices, recommendations, performance, credentials, production state or message destinations. It is an operations case study, not an investment system or an exactly-once distributed-delivery guarantee.
           EOF
           assets=(
             "dist/goal49-ops-case-study-${PLAIN_VERSION}.tar.gz"
@@ -180,12 +131,7 @@ jobs:
           )
           if gh release view "$VERSION" >/dev/null 2>&1; then
             gh release upload "$VERSION" "${assets[@]}" --clobber
-            gh release edit "$VERSION" \
-              --title "Goal49 Operations Case Study $VERSION" \
-              --notes-file "$RUNNER_TEMP/release-notes.md"
+            gh release edit "$VERSION" --title "Goal49 Operations Case Study $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"
           else
-            gh release create "$VERSION" "${assets[@]}" \
-              --title "Goal49 Operations Case Study $VERSION" \
-              --notes-file "$RUNNER_TEMP/release-notes.md" \
-              --verify-tag
+            gh release create "$VERSION" "${assets[@]}" --title "Goal49 Operations Case Study $VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --verify-tag
           fi
