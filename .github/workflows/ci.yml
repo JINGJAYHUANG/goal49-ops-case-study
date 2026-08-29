@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: goal49-ops-case-study-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: ""
+
+      - name: Install package
+        run: python -m pip install --no-deps -e .
+
+      - name: Compile
+        run: python -m compileall -q src scripts tests
+
+      - name: Test
+        run: python -m unittest discover -s tests -v
+
+      - name: Audit public boundary
+        run: python scripts/public_audit.py .
+
+      - name: Verify deterministic clean runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/goal49-demo-a /tmp/goal49-demo-b
+          goal49-ops-demo run-demo \
+            --config examples/synthetic-config.json \
+            --universe examples/synthetic-universe.json \
+            --workdir /tmp/goal49-demo-a > /tmp/result-a.json
+          goal49-ops-demo run-demo \
+            --config examples/synthetic-config.json \
+            --universe examples/synthetic-universe.json \
+            --workdir /tmp/goal49-demo-b > /tmp/result-b.json
+          diff -u /tmp/result-a.json /tmp/result-b.json
+          diff -ru /tmp/goal49-demo-a /tmp/goal49-demo-b
+          goal49-ops-demo verify \
+            --workdir /tmp/goal49-demo-a \
+            --target DEMO-2026-01-15
