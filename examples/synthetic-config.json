@@ -1,0 +1,51 @@
+{
+  "target": "DEMO-2026-01-15",
+  "source_revision": "synthetic-source-v1",
+  "prepared_at": "2026-01-15T00:00:00Z",
+  "decision_time": "2026-01-15T01:00:00Z",
+  "deadline": "2026-01-15T01:05:00Z",
+  "freshness_seconds": 180,
+  "minimum_coverage": 0.75,
+  "max_items": 5,
+  "providers": [
+    {
+      "provider": "provider-a",
+      "target": "DEMO-2026-01-15",
+      "observed_at": "2026-01-15T00:55:00Z",
+      "observations": [
+        {"item_id": "ITEM-001", "eligible": true},
+        {"item_id": "ITEM-002", "eligible": false},
+        {"item_id": "ITEM-003", "eligible": true},
+        {"item_id": "ITEM-004", "eligible": true},
+        {"item_id": "ITEM-005", "eligible": false},
+        {"item_id": "ITEM-006", "eligible": true},
+        {"item_id": "ITEM-007", "eligible": false},
+        {"item_id": "ITEM-008", "eligible": false}
+      ]
+    },
+    {
+      "provider": "provider-b",
+      "target": "DEMO-2026-01-15",
+      "observed_at": "2026-01-15T00:59:30Z",
+      "observations": [
+        {"item_id": "ITEM-001", "eligible": true},
+        {"item_id": "ITEM-002", "eligible": false},
+        {"item_id": "ITEM-003", "eligible": true},
+        {"item_id": "ITEM-004", "eligible": true},
+        {"item_id": "ITEM-005", "eligible": false},
+        {"item_id": "ITEM-006", "eligible": true},
+        {"item_id": "ITEM-007", "eligible": false}
+      ]
+    },
+    {
+      "provider": "provider-c",
+      "target": "DEMO-2026-01-15",
+      "observed_at": "2026-01-15T00:59:45Z",
+      "observations": [
+        {"item_id": "ITEM-001", "eligible": true},
+        {"item_id": "ITEM-002", "eligible": false},
+        {"item_id": "ITEM-003", "eligible": true}
+      ]
+    }
+  ]
+}
