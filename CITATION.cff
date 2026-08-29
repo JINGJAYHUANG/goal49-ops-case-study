@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this case study, please cite it as below."
+title: "Goal49 Operations Case Study"
+type: software
+authors:
+  - family-names: "Huang"
+    given-names: "Jingjie"
+version: 0.1.0
+date-released: 2026-08-29
+repository-code: "https://github.com/JINGJAYHUANG/goal49-ops-case-study"
+license: MIT
+abstract: "A sanitized, synthetic reliability-engineering case study for scheduled decision pipelines."
